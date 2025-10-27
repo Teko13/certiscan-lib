@@ -1,0 +1,44 @@
+{
+  "name": "@teko13/certiscan",
+  "version": "1.0.0",
+  "description": "JavaScript library for decoding and verifying French 2D-Doc QR codes (ANTS specification)",
+  "main": "src/index.js",
+  "type": "module",
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "scan": "node src/scan.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "2d-doc",
+    "qr-code",
+    "france",
+    "ants",
+    "vaccination",
+    "certificate",
+    "verification",
+    "signature",
+    "javascript",
+    "parser"
+  ],
+  "author": "teko13",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/teko13/certiscan.git"
+  },
+  "bugs": {
+    "url": "https://github.com/teko13/certiscan/issues"
+  },
+  "homepage": "https://github.com/teko13/certiscan#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  }
+}
