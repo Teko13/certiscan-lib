@@ -1,6 +1,6 @@
 {
   "name": "@teko13/certiscan",
-  "version": "1.0.0",
+  "version": "1.0.11",
   "description": "JavaScript library for decoding and verifying French 2D-Doc QR codes (ANTS specification)",
   "main": "src/index.js",
   "type": "module",

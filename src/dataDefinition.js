@@ -1,7 +1,5 @@
 /**
- * 2D-Doc data definitions from
- * "Specifications-techniques-des-codes-a-barres_2D-Doc_v3.1.3.pdf" from
- * ANTS website. This only defines perimeter ID 1.
+ * 2D-Doc data definitions - JavaScript port of data_definition.py
  */
 
 class Format {
@@ -181,18 +179,21 @@ class PhoneNumber extends String {
 }
 
 class Date4 extends Format {
-    static EPOCH = new Date(2000, 0, 1); // January 1, 2000
+    constructor(sizeMin, sizeMax) {
+        super(sizeMin, sizeMax);
+        this.EPOCH = new Date(2000, 0, 1); // January 1, 2000
+    }
 
     parse(text) {
         const v = parseInt(text, 16);
-        const date = new Date(Date4.EPOCH);
+        const date = new Date(this.EPOCH);
         date.setDate(date.getDate() + v);
         return date;
     }
 
     serialize(d) {
-        const daysDiff = Math.floor((d - Date4.EPOCH) / (1000 * 60 * 60 * 24));
-        return daysDiff.toString(16).toUpperCase().padStart(4, '0');
+        const days = Math.floor((d - this.EPOCH) / (1000 * 60 * 60 * 24));
+        return days.toString(16).toUpperCase().padStart(4, '0');
     }
 }
 
@@ -217,7 +218,7 @@ class JJMMAAAA extends Format {
     serialize(d) {
         const day = d.getDate().toString().padStart(2, '0');
         const month = (d.getMonth() + 1).toString().padStart(2, '0');
-        const year = d.getFullYear().toString();
+        const year = d.getFullYear().toString().padStart(4, '0');
         return `${day}${month}${year}`;
     }
 }
@@ -235,7 +236,7 @@ class JJMMAAAAHHMM extends Format {
     serialize(d) {
         const day = d.getDate().toString().padStart(2, '0');
         const month = (d.getMonth() + 1).toString().padStart(2, '0');
-        const year = d.getFullYear().toString();
+        const year = d.getFullYear().toString().padStart(4, '0');
         const hour = d.getHours().toString().padStart(2, '0');
         const minute = d.getMinutes().toString().padStart(2, '0');
         return `${day}${month}${year}${hour}${minute}`;
@@ -250,8 +251,9 @@ class HexInt extends Format {
     serialize(v) {
         if (this.sizeMin === this.sizeMax) {
             return v.toString(16).toUpperCase().padStart(this.sizeMin, '0');
+        } else {
+            return v.toString(16).toUpperCase();
         }
-        return v.toString(16).toUpperCase();
     }
 }
 
@@ -288,46 +290,55 @@ class HHMM extends Format {
 class StringBase32 extends Format {
     parse(text) {
         // Simple base32 decode implementation
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-        let result = '';
+        const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         let bits = 0;
         let value = 0;
+        let index = 0;
+        const result = [];
         
-        for (const char of text) {
-            const index = alphabet.indexOf(char.toUpperCase());
-            if (index === -1) continue;
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i].toUpperCase();
+            if (char === '=') break;
             
-            value = (value << 5) | index;
+            const charIndex = base32Alphabet.indexOf(char);
+            if (charIndex === -1) continue;
+            
+            value = (value << 5) | charIndex;
             bits += 5;
             
-            while (bits >= 8) {
-                result += String.fromCharCode((value >> (bits - 8)) & 0xFF);
+            if (bits >= 8) {
+                result[index++] = (value >>> (bits - 8)) & 0xFF;
                 bits -= 8;
             }
         }
         
-        return result;
+        return new Uint8Array(result);
     }
 
     serialize(text) {
         // Simple base32 encode implementation
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-        let result = '';
+        const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         let bits = 0;
         let value = 0;
+        let result = '';
         
-        for (const char of text) {
-            value = (value << 8) | char.charCodeAt(0);
+        for (let i = 0; i < text.length; i++) {
+            value = (value << 8) | text[i];
             bits += 8;
             
             while (bits >= 5) {
-                result += alphabet[(value >> (bits - 5)) & 0x1F];
+                result += base32Alphabet[(value >>> (bits - 5)) & 0x1F];
                 bits -= 5;
             }
         }
         
         if (bits > 0) {
-            result += alphabet[(value << (5 - bits)) & 0x1F];
+            result += base32Alphabet[(value << (5 - bits)) & 0x1F];
+        }
+        
+        // Add padding
+        while (result.length % 8 !== 0) {
+            result += '=';
         }
         
         return result;
@@ -426,7 +437,7 @@ class Definitions {
 }
 
 // Create the C40 definitions
-const c40 = new Definitions(
+export const c40 = new Definitions(
     new Perimeter(1,
         new Doctype("00", "Justificatif de domicile", "Spécifique"),
         new Doctype("01", "Justificatif de domicile", "Facture"),
@@ -465,7 +476,7 @@ const c40 = new Definitions(
         new Doctype("B2", "Résultats des tests virologiques", "Test COVID"),
         new Doctype("L1", "Attestation Vaccinale", "Attestation Vaccinale"),
         new Doctype("16", "Justificatif d'Asile", "Attestation de Demande d'Asile"),
-        new Doctype("17", "Justificatif d'Asile", "Attestation de fin de droit à l'allocation pour demandeur d'asile (ADA)"),
+        new Doctype("17", "Justificatif d'Asile", "Attestation de fin de droit à l'allocation pour demandeur d'asile (ADA"),
         new Doctype("L1", "Caducée Infirmier", "Caducée Infirmier"),
 
         new Group("Identifiants de données complémentaires du code 2D-DOC",
@@ -899,7 +910,3 @@ const c40 = new Definitions(
         ),
     )
 );
-
-export { c40 };
-export default { c40 };
-

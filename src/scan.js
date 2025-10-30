@@ -1,5 +1,5 @@
 /**
- * Decoder for 2D-Doc QR codes - JavaScript version
+ * Main decoder module - JavaScript port of dec.py
  */
 
 import { TwoDDoc } from './doc.js';
@@ -10,25 +10,21 @@ function jsonSerializer(obj) {
      * Fonction de sérialisation personnalisée pour convertir les objets non sérialisables en JSON.
      */
     if (obj instanceof Date) {
-        // Return date in YYYY-MM-DD format like Python does
-        const year = obj.getFullYear();
-        const month = (obj.getMonth() + 1).toString().padStart(2, '0');
-        const day = obj.getDate().toString().padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return obj.toISOString();
     } else if (obj && typeof obj === 'object' && obj.constructor === Object) {
         return obj.toString();
     } else {
-        return obj.toString();
+        return String(obj);
     }
 }
 
-export function decoderQrCode(codeBrut) {
+export async function decoderQrCode(codeBrut) {
     /**
      * Décode un QR code 2D-Doc et retourne un JSON structuré avec les informations.
      * 
      * Args:
      *     codeBrut (string): La chaîne brute du QR code 2D-Doc
-     *         
+     *     
      * Returns:
      *     object: JSON structuré contenant header, message et signature
      */
@@ -45,6 +41,7 @@ export function decoderQrCode(codeBrut) {
         }
     };
     
+    let doc;
     try {
         // Gérer le cas où le séparateur est ^_ au lieu de \x1f
         if (codeBrut.includes('^_') && !codeBrut.includes('\x1f')) {
@@ -52,7 +49,7 @@ export function decoderQrCode(codeBrut) {
             codeBrut = codeBrut.replace(/\^_/g, '\x1f');
         }
         
-        const doc = TwoDDoc.fromCode(codeBrut);
+        doc = await TwoDDoc.fromCode(codeBrut);
         result.success = true;
     } catch (e) {
         result.error = e.message;
@@ -61,31 +58,20 @@ export function decoderQrCode(codeBrut) {
 
     // ---- HEADER ----
     const headerData = {};
-    const doc = TwoDDoc.fromCode(codeBrut);
+    const header = doc.header;
     
-    // Extract header properties using the same logic as Python
-    // Use snake_case to match Python version exactly
-    const headerProps = [
-        { js: 'version', py: 'version' },
-        { js: 'caId', py: 'ca_id' },
-        { js: 'certId', py: 'cert_id' },
-        { js: 'emitDate', py: 'emit_date' },
-        { js: 'signDate', py: 'sign_date' },
-        { js: 'docTypeId', py: 'doc_type_id' },
-        { js: 'perimeterId', py: 'perimeter_id' },
-        { js: 'countryId', py: 'country_id' },
-        { js: 'length', py: 'length' },
-        { js: 'mode', py: 'mode' }
-    ];
-    
+    // Extract header properties
+    const headerProps = ['version', 'caId', 'certId', 'emitDate', 'signDate', 'docTypeId', 'perimeterId', 'countryId'];
     for (const prop of headerProps) {
-        if (doc.header[prop.js] !== undefined) {
-            let value = doc.header[prop.js];
+        if (header.hasOwnProperty(prop)) {
+            let value = header[prop];
             // Convertir les objets non sérialisables en chaînes
-            if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean' && value !== null) {
+            if (value !== null && value !== undefined && 
+                typeof value !== 'string' && typeof value !== 'number' && 
+                typeof value !== 'boolean') {
                 value = jsonSerializer(value);
             }
-            headerData[prop.py] = value;
+            headerData[prop] = value;
         }
     }
     result.header = headerData;
@@ -104,22 +90,27 @@ export function decoderQrCode(codeBrut) {
             const dataDict = {};
             for (let i = 0; i < dataset.length; i++) {
                 const item = dataset[i];
+                let name = null;
                 try {
                     // on essaye de récupérer le nom du champ depuis la définition si dispo
-                    let name = item.definition.label || item.definition.name;
-                    if (!name) {
-                        name = `Champ_${i + 1}`;
+                    if (item.definition) {
+                        name = item.definition.label || item.definition.name || null;
                     }
-
-                    let value = item.value;
-                    // Convertir les objets non sérialisables en chaînes
-                    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean' && value !== null) {
-                        value = jsonSerializer(value);
-                    }
-                    dataDict[name] = value;
                 } catch (e) {
-                    dataDict[`Champ_${i + 1}`] = item.value || '';
+                    name = null;
                 }
+                if (!name) {
+                    name = `Champ_${i + 1}`;
+                }
+
+                let value = item.value || null;
+                // Convertir les objets non sérialisables en chaînes
+                if (value !== null && value !== undefined && 
+                    typeof value !== 'string' && typeof value !== 'number' && 
+                    typeof value !== 'boolean') {
+                    value = jsonSerializer(value);
+                }
+                dataDict[name] = value;
             }
 
             result.message = {
@@ -148,13 +139,11 @@ export function decoderQrCode(codeBrut) {
 if (import.meta.url === `file://${process.argv[1]}`) {
     if (process.argv.length !== 3) {
         console.log("Usage: node scan.js <CHAINE-2D-DOC>");
-        console.log("Exemple: node scan.js 'VOTRE_CHAINE_2D_DOC_ICI'");
+        console.log("Exemple: node scan.js '<CHAINE-2D-DOC-EXEMPLE>'");
         process.exit(1);
     }
     
     const codeBrut = process.argv[2];
-    const result = decoderQrCode(codeBrut);
+    const result = await decoderQrCode(codeBrut);
     console.log(JSON.stringify(result, null, 2));
 }
-
-export default { decoderQrCode };

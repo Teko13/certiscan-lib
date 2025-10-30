@@ -1,5 +1,5 @@
 /**
- * C40 codec
+ * C40 codec - JavaScript port of Python c40.py
  */
 
 // Just arbitrarily map FNC1 to u0080
@@ -8,10 +8,10 @@ const FNC1 = '\u0080';
 class Codec {
     constructor(sets) {
         this.sets = sets;
-        this.reverse = this._reverseGen(sets);
+        this.reverse = Codec._reverseGen(sets);
     }
 
-    _reverseGen(sets) {
+    static _reverseGen(sets) {
         const r = {};
         for (let i = 0; i < sets.length; i++) {
             const set = sets[i];
@@ -51,8 +51,8 @@ class Codec {
     static asciiDecode(cs, sets) {
         let lock = false;
         let s = 0;
-
         let ret = '';
+
         for (const c of cs) {
             if (s === 0 && c <= 2) {
                 s = c + 1;
@@ -129,15 +129,15 @@ class Codec {
     }
 }
 
-// Create character sets
-const set0_c40 = {};
-for (let i = 0; i < " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".length; i++) {
-    set0_c40[i + 3] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i];
+// Character sets
+const set0C40 = {};
+for (let i = 0; i < 33; i++) {
+    set0C40[i + 3] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i];
 }
 
-const set0_text = {};
-for (const [k, v] of Object.entries(set0_c40)) {
-    set0_text[k] = v.toLowerCase();
+const set0Text = {};
+for (const [k, v] of Object.entries(set0C40)) {
+    set0Text[k] = v.toLowerCase();
 }
 
 const set1 = {};
@@ -151,19 +151,17 @@ for (let i = 0; i < set2Chars.length; i++) {
     set2[i] = set2Chars[i];
 }
 
-const set3_c40 = {};
+const set3C40 = {};
 const set3Chars = "`abcdefghijklmnopqrstuvwxyz{|}~\x7f";
 for (let i = 0; i < set3Chars.length; i++) {
-    set3_c40[i] = set3Chars[i];
+    set3C40[i] = set3Chars[i];
 }
 
-const set3_text = {};
-for (const [k, v] of Object.entries(set3_c40)) {
-    set3_text[k] = v.toUpperCase();
+const set3Text = {};
+for (const [k, v] of Object.entries(set3C40)) {
+    set3Text[k] = v.toUpperCase();
 }
 
 // Define both C40 and Text mode, even if this project only uses C40.
-export const c40 = new Codec([set0_c40, set1, set2, set3_c40]);
-export const text = new Codec([set0_text, set1, set2, set3_text]);
-
-export default { c40, text };
+export const c40 = new Codec([set0C40, set1, set2, set3C40]);
+export const text = new Codec([set0Text, set1, set2, set3Text]);

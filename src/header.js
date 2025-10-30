@@ -1,5 +1,5 @@
 /**
- * 2D-Doc header representation
+ * 2D-Doc header representation - JavaScript port of header.py
  */
 
 import { c40 } from './c40.js';
@@ -30,8 +30,8 @@ function dateParse(code) {
 
 function dateEncode(d, mode = "c40") {
     if (mode === "c40") {
-        const daysDiff = Math.floor((d - EPOCH) / (1000 * 60 * 60 * 24));
-        return daysDiff.toString(16).toUpperCase().padStart(4, '0');
+        const days = Math.floor((d - EPOCH) / (1000 * 60 * 60 * 24));
+        return days.toString(16).toUpperCase().padStart(4, '0');
     } else if (mode === "bin") {
         const v = d.getMonth() * 1000000 + d.getDate() * 10000 + d.getFullYear();
         const buffer = new Uint8Array(3);
@@ -45,9 +45,6 @@ function dateEncode(d, mode = "c40") {
 }
 
 export class Header {
-    /**
-     * 2D-Doc header
-     */
     constructor(version, caId, certId, emitDate, signDate, docTypeId, perimeterId = '01', countryId = "FR") {
         this.version = version;
         this.caId = caId;
@@ -75,10 +72,11 @@ export class Header {
             const emitDate = dateParse(code.substring(12, 16));
             const signDate = dateParse(code.substring(16, 20));
             const docTypeId = code.substring(20, 22);
-            const perimeterId = version >= 3 ? code.substring(22, 24) : "01";
+            const perimeterId = version >= 3 ? parseInt(code.substring(22, 24)) : 1;
             const countryId = version >= 4 ? code.substring(24, 26) : "FR";
 
             return new Header(version, caId, certId, emitDate, signDate, docTypeId, perimeterId, countryId);
+
         } else if (code instanceof Uint8Array && code[0] === 0xdc) {
             const version = code[1];
             if (version !== 4) {
@@ -94,6 +92,7 @@ export class Header {
             const perimeterId = (code[17] << 8) | code[18];
 
             return new Header(version, caId, certId, emitDate, signDate, docTypeId, perimeterId, countryId);
+
         } else {
             throw new Error("Not a 2D-Doc");
         }
@@ -103,7 +102,7 @@ export class Header {
         /**
          * Actual length of header, needed to know where data starts
          */
-        if (this.version === 1 || this.version === 2) {
+        if ([1, 2].includes(this.version)) {
             return 22;
         }
         if (this.version === 3) {
@@ -123,13 +122,13 @@ export class Header {
          * Actual mode of header ("c40" or "bin"). Needed to interpret
          * message part of document.
          */
-        if (this.countryId && this.countryId.length === 2) {
+        if (this.countryId.length === 2) {
             return "c40";
         }
-        if (this.countryId && this.countryId.length === 3) {
+        if (this.countryId.length === 3) {
             return "bin";
         }
-        return "c40"; // Default to c40 mode
+        throw new Error("Invalid country ID length");
     }
 
     toCode() {
@@ -141,8 +140,8 @@ export class Header {
             buffer[0] = 0xdc;
             buffer[1] = 0x04;
             
-            const countryBytes = c40.format(this.countryId);
-            buffer.set(countryBytes, 2);
+            const countryIdBytes = c40.format(this.countryId);
+            buffer.set(countryIdBytes, 2);
             
             const caCertBytes = c40.format(this.caId + this.certId);
             buffer.set(caCertBytes, 4);
@@ -167,6 +166,3 @@ export class Header {
         return c40.doctypeGet(this.perimeterId, this.docTypeId);
     }
 }
-
-export { dateParse, dateEncode };
-export default Header;

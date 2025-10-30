@@ -1,14 +1,11 @@
 /**
- * Message part
+ * Message part - JavaScript port of message.py
  */
-
-import { c40 } from './dataDefinition.js';
 
 const GS = '\x1d';
 const RS = '\x1e';
 
 export class Data {
-    "A data entry"
     constructor(group, definition, value) {
         this.group = group;
         this.definition = definition;
@@ -17,7 +14,6 @@ export class Data {
 }
 
 export class VariableData extends Data {
-    "A variable length data entry"
     constructor(group, definition, value, complete = true) {
         super(group, definition, value);
         this.complete = complete;
@@ -25,41 +21,42 @@ export class VariableData extends Data {
 }
 
 export class FixedData extends Data {
-    "A fixed length data entry"
+    constructor(group, definition, value) {
+        super(group, definition, value);
+    }
 }
 
 export class Message {
-    "A message"
     constructor(perimeterId, dataset) {
-        // Convert perimeterId to number if it's a string
-        this.perimeterId = typeof perimeterId === 'string' ? parseInt(perimeterId) : perimeterId;
+        this.perimeterId = perimeterId;
         this.dataset = [...dataset];
     }
 }
 
 export class C40Message extends Message {
-    "A C40 message"
     encode(maxLength = null) {
         throw new Error("Not implemented");
     }
 
-    static fromCode(perimeterId, code) {
+    static async fromCode(perimeterId, code) {
         /**
          * Load a message from a C40 code string, for a given perimeter ID.
          */
         const self = new C40Message(perimeterId, []);
         let remainingCode = code;
-        let iterations = 0;
-        while (remainingCode && iterations < 100) { // Protection against infinite loop
-            const [data, newCode] = self.codeExtract(remainingCode);
+        
+        while (remainingCode && remainingCode.length > 0) {
+            const [data, newCode] = await self.codeExtract(remainingCode);
             self.dataset.push(data);
-            if (newCode === remainingCode) {
-                // No progress made, break to avoid infinite loop
+            remainingCode = newCode;
+            
+            // Protection contre les boucles infinies
+            if (remainingCode === code) {
+                console.warn("Boucle infinie détectée, arrêt du parsing");
                 break;
             }
-            remainingCode = newCode;
-            iterations++;
         }
+        
         return self;
     }
 
@@ -69,7 +66,8 @@ export class C40Message extends Message {
          */
         const value = definition.encoding.parse(code.substring(2, 2 + definition.fixed));
         const data = new FixedData(group, definition, value);
-        if (code.substring(2 + definition.fixed, 2 + definition.fixed + 1) === GS) {
+        
+        if (code[2 + definition.fixed] === GS) {
             return [data, code.substring(2 + definition.fixed + 1)];
         }
         return [data, code.substring(2 + definition.fixed)];
@@ -82,9 +80,11 @@ export class C40Message extends Message {
         let endPos;
         let complete = false;
         
+        // Chercher RS d'abord
         endPos = code.indexOf(RS);
         if (endPos === -1) {
             complete = true;
+            // Si pas de RS, chercher GS
             endPos = code.indexOf(GS);
             if (endPos === -1) {
                 endPos = null;
@@ -93,12 +93,19 @@ export class C40Message extends Message {
 
         if (definition.encoding.sizeMax !== null &&
             (endPos === null || endPos > 2 + definition.encoding.sizeMax)) {
-            endPos = definition.encoding.sizeMax + 1;
+            endPos = 2 + definition.encoding.sizeMax;
             complete = true;
         }
 
-        const value = definition.encoding.parse(code.substring(2, endPos || code.length));
+        let value;
+        if (endPos === null) {
+            value = definition.encoding.parse(code.substring(2));
+        } else {
+            value = definition.encoding.parse(code.substring(2, endPos));
+        }
+        
         const data = new FixedData(group, definition, value);
+        
         if (endPos === null) {
             return [data, ''];
         } else {
@@ -106,16 +113,21 @@ export class C40Message extends Message {
         }
     }
 
-    codeExtract(code) {
+    async codeExtract(code) {
         /**
          * Parse next data item in the stream
          */
-        const [group, definition] = c40.datatypeGet(this.perimeterId, code.substring(0, 2));
+        if (code.length < 2) {
+            return [null, ''];
+        }
+        
+        const { c40 } = await import('./dataDefinition.js');
+        const fieldId = code.substring(0, 2);
+        const [group, definition] = c40.datatypeGet(this.perimeterId, fieldId);
+        
         if (definition.fixed !== null) {
             return C40Message.fixedParse(group, definition, code);
         }
         return C40Message.variableParse(group, definition, code);
     }
 }
-
-export default { Data, VariableData, FixedData, Message, C40Message };

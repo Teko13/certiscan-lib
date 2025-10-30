@@ -1,85 +1,54 @@
 /**
- * Keychain management - Simplified JavaScript version
- * Note: This is a simplified version that doesn't include full certificate parsing
- * For production use, you would need to implement proper ASN.1 parsing
+ * Keychain management - JavaScript port of keychain.py (simplified)
  */
 
-import { createHash, createVerify } from 'crypto';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export class PublicKey {
-    /**
-     * A public key store. Only NIST P-256 is supported for now.
-     */
-    static idPrime256v1 = "1.2.840.10045.3.1.7";
-    static idEcPublicKey = "1.2.840.10045.2.1";
-
     constructor(type, key) {
         this.type = type;
         this.key = key;
     }
 
     static fromDer(data) {
-        // Simplified implementation - in production you'd need proper ASN.1 parsing
-        // For now, we'll assume the key is provided in a usable format
-        throw new Error("Certificate parsing not fully implemented in JS version");
+        // Simplified implementation - in a real implementation, you would use
+        // a proper ASN.1 parser and crypto library
+        throw new Error("PublicKey.fromDer not implemented - requires crypto library");
     }
 
     signatureIsValid(data, signature) {
-        // Simplified signature verification
-        // In production, you'd need proper ECDSA verification
-        try {
-            const hash = createHash('sha256').update(data).digest();
-            const verify = createVerify('sha256');
-            verify.update(data);
-            // This is a placeholder - real implementation would need proper ECDSA
-            return true; // Simplified for demo
-        } catch (e) {
-            return false;
-        }
+        // Simplified implementation - in a real implementation, you would use
+        // proper cryptographic verification
+        console.warn("Signature verification not implemented - requires crypto library");
+        return false;
     }
 }
 
 export class Dn {
-    /**
-     * X-509 Certificate DN low-tech parser/container
-     */
     constructor(values = {}) {
-        this._values = values;
+        this.values = values;
     }
 
     get(name) {
-        return this._values[name];
+        return this.values[name];
     }
 
     set(name, value) {
-        this._values[name] = value;
+        this.values[name] = value;
     }
 
-    static oids = {
-        "2.5.4.3": "commonName",
-        "2.5.4.4": "surname",
-        "2.5.4.5": "serialNumber",
-        "2.5.4.6": "countryName",
-        "2.5.4.7": "localityName",
-        "2.5.4.8": "stateOrProvinceName",
-        "2.5.4.9": "streetAddress",
-        "2.5.4.10": "organizationName",
-        "2.5.4.11": "organizationalUnitName",
-        "2.5.4.12": "title",
-        "2.5.4.13": "description",
-        "2.5.4.14": "searchGuide",
-    };
-
     static fromDer(data) {
-        // Simplified implementation - would need proper ASN.1 parsing
-        throw new Error("DN parsing not fully implemented in JS version");
+        // Simplified implementation - in a real implementation, you would use
+        // a proper ASN.1 parser
+        return new Dn();
     }
 }
 
 export class Certificate {
-    /**
-     * X-509 Certificate DN low-tech parser. Does not verify cert signature.
-     */
     constructor(issuer, subject, pubkey) {
         this.issuer = issuer;
         this.subject = subject;
@@ -87,16 +56,13 @@ export class Certificate {
     }
 
     static fromDer(data) {
-        // Simplified implementation - would need proper ASN.1 parsing
-        throw new Error("Certificate parsing not fully implemented in JS version");
+        // Simplified implementation - in a real implementation, you would use
+        // a proper ASN.1 parser and crypto library
+        return new Certificate(new Dn(), new Dn(), new PublicKey('unknown', null));
     }
 }
 
 export class KeyChain {
-    /**
-     * Certificate store, indexes certificates through common name of
-     * issuer and subject. This is somehow 2D-Doc specific.
-     */
     constructor(certs = []) {
         this.certs = [...certs];
     }
@@ -111,9 +77,10 @@ export class KeyChain {
         throw new Error(`Key not found: ${caCn}, ${certCn}`);
     }
 
-    derMultipartLoad(fd) {
-        // Simplified implementation
-        throw new Error("Multipart loading not implemented in JS version");
+    derMultipartLoad(data) {
+        // Simplified implementation for loading certificates
+        // In a real implementation, you would parse the multipart data properly
+        console.warn("Certificate loading not fully implemented");
     }
 
     derAdd(der) {
@@ -121,7 +88,7 @@ export class KeyChain {
             const cert = Certificate.fromDer(der);
             this.certs.push(cert);
         } catch (e) {
-            // Ignore invalid certificates
+            console.warn("Failed to add certificate:", e.message);
         }
     }
 }
@@ -129,21 +96,22 @@ export class KeyChain {
 export function internal() {
     /**
      * Spawn a keychain with all built-in certificated loaded.
-     * Note: This is a placeholder implementation for the JS version
      */
     const k = new KeyChain();
     
-    // In the real implementation, you would load certificates from files
-    // For now, we'll create a mock certificate for testing
-    const mockIssuer = new Dn({ commonName: "FR00" });
-    const mockSubject = new Dn({ commonName: "0001" });
-    const mockPubkey = new PublicKey("p256v1", null);
-    const mockCert = new Certificate(mockIssuer, mockSubject, mockPubkey);
+    // In a real implementation, you would load the actual certificate files
+    // For now, we'll create dummy certificates
+    const chains = ["FR00", "FR01", "FR02", "FR03", "FR04"];
     
-    k.certs.push(mockCert);
+    for (const chain of chains) {
+        try {
+            const chainPath = join(__dirname, '..', 'chains', chain + '.der');
+            const data = readFileSync(chainPath);
+            k.derAdd(data);
+        } catch (e) {
+            console.warn(`Failed to load chain ${chain}:`, e.message);
+        }
+    }
     
     return k;
 }
-
-export default { PublicKey, Dn, Certificate, KeyChain, internal };
-
